@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Двухсторонний голосовой переводчик</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background: #1e293b;
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+            position: relative;
+        }
+        select, button, input {
+            margin: 10px 0;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 8px;
+            border: none;
+            outline: none;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        select, input {
+            background: #334155;
+            color: white;
+        }
+        input::placeholder {
+            color: #94a3b8;
+        }
+        button {
+            background: #6366f1;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        button:hover:not(:disabled) {
+            background: #4f46e5;
+        }
+        button:disabled {
+            background: #475569;
+            color: #94a3b8;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        button.secondary {
+            background: #0ea5e9;
+        }
+        button.secondary:hover:not(:disabled) {
+            background: #0284c7;
+        }
+        button.recording {
+            background: #ef4444 !important;
+            animation: pulse 1.5s infinite;
+        }
+        .result-box {
+            margin-top: 15px;
+            text-align: left;
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 8px;
+            min-height: 50px;
+            word-break: break-word;
+        }
+        .label {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 4px;
+        }
+        .limit-info {
+            font-size: 14px;
+            color: #38bdf8;
+            margin-bottom: 15px;
+            font-weight: 600;
+            background: #0f172a;
+            padding: 8px;
+            border-radius: 8px;
+        }
+        /* Модальное окно подписки */
+        #paywallModal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .modal-content {
+            background: #1e293b;
+            padding: 25px;
+            border-radius: 16px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            border: 2px solid #6366f1;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+        }
+        .modal-content h3 {
+            margin-top: 0;
+            color: #f8fafc;
+            font-size: 20px;
+        }
+        .modal-content p {
+            color: #94a3b8;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 10px;
+        }
+        .kaspi-box {
+            background: #0f172a;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 15px;
+            color: #f8fafc;
+            border: 1px dashed #334155;
+        }
+        .kaspi-number {
+            color: #38bdf8;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .price-tag {
+            color: #10b981;
+            font-weight: bold;
+        }
+        .tg-link {
+            color: #38bdf8;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .tg-link:hover {
+            text-decoration: underline;
+        }
+        .pay-btn {
+            background: #10b981;
+            margin-top: 5px;
+        }
+        .pay-btn:hover {
+            background: #059669;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>Голосовой переводчик</h2>
+        
+        <div class="limit-info" id="limitInfo">Бесплатные попытки: загрузка...</div>
+
+        <label class="label" for="myLang">Я говорю на:</label>
+        <select id="myLang">
+            <option value="ru-RU">Русский</option>
+            <option value="kk-KZ">Казахский (Қазақша)</option>
+            <option value="en-US">Английский</option>
+        </select>
+
+        <label class="label" for="targetLang">Переводить на мой язык:</label>
+        <select id="targetLang">
+            <option value="ru">Русский</option>
+            <option value="kk">Казахский (Қазақша)</option>
+            <option value="en">Английский</option>
+            <option value="es">Испанский</option>
+        </select>
+
+        <!-- Кнопка для тебя -->
+        <button id="myMicBtn">🗣️ Говорить (Моя реплика)</button>
+
+        <!-- Кнопка для собеседника (иностранца) -->
+        <label class="label" style="margin-top: 15px;" for="partnerLang">Собеседник говорит на:</label>
+        <select id="partnerLang">
+            <option value="en-US">Английский</option>
+            <option value="kk-KZ">Казахский (Қазақша)</option>
+            <option value="ru-RU">Русский</option>
+        </select>
+
+        <button id="partnerMicBtn" class="secondary">🌍 Собеседник говорит</button>
+
+        <div class="result-box">
+            <div class="label" id="originalLabel">Сказано:</div>
+            <div id="originalText">-</div>
+        </div>
+
+        <div class="result-box">
+            <div class="label" id="translatedLabel">Перевод:</div>
+            <div id="translatedText">-</div>
+        </div>
+    </div>
+
+    <!-- Модальное окно при исчерпании лимита -->
+    <div id="paywallModal">
+        <div class="modal-content">
+            <h3>🔒 Лимит бесплатных попыток исчерпан</h3>
+            <p>Переведите <span class="price-tag">500 тенге</span> на Kaspi Gold:</p>
+            
+            <div class="kaspi-box">
+                <span class="kaspi-number">+7 775 430 2037</span>
+            </div>
+            
+            <p style="font-size: 13px;">Отправьте скриншот перевода в Telegram: <br><a href="https://t.me/q_empire" target="_blank" class="tg-link">@q_empire</a> и получите секретное слово.</p>
+            
+            <input type="text" id="secretInput" placeholder="Введите секретное слово...">
+            <button class="pay-btn" onclick="checkSecretWord()">Активировать</button>
+        </div>
+    </div>
+
+    <script>
+        const FREE_LIMIT = 2; // Ровно 2 бесплатные попытки
+        const SECRET_WORD = "QEMPIRE"; // Секретное слово для активации
+
+        function getUsageCount() {
+            let count = localStorage.getItem('translation_uses');
+            return count ? parseInt(count) : 0;
+        }
+
+        function updateLimitDisplay() {
+            const isPremium = localStorage.getItem('is_premium') === 'true';
+            const uses = getUsageCount();
+            const remaining = Math.max(0, FREE_LIMIT - uses);
+
+            if (isPremium) {
+                document.getElementById('limitInfo').textContent = '✨ Безлимитный режим активен';
+                document.getElementById('myMicBtn.disabled = false;'); // на всякий случай
+                document.getElementById('partnerMicBtn.disabled = false;');
+                return;
+            }
+
+            document.getElementById('limitInfo').textContent = `Бесплатные попытки: ${remaining} из ${FREE_LIMIT}`;
+
+            // Если лимит исчерпан — блокируем кнопки
+            if (uses >= FREE_LIMIT) {
+                myMicBtn.disabled = true;
+                partnerMicBtn.disabled = true;
+                myMicBtn.style.opacity = '0.5';
+                partnerMicBtn.style.opacity = '0.5';
+            }
+        }
+
+        function checkSecretWord() {
+            const userInputValue = document.getElementById('secretInput').value.trim();
+            if (userInputValue.toUpperCase() === SECRET_WORD) {
+                localStorage.setItem('is_premium', 'true');
+                document.getElementById('paywallModal').style.display = 'none';
+                
+                // Разблокируем кнопки обратно
+                myMicBtn.disabled = false;
+                partnerMicBtn.disabled = false;
+                myMicBtn.style.opacity = '1';
+                partnerMicBtn.style.opacity = '1';
+
+                alert('Безлимитный доступ успешно активирован!');
+                updateLimitDisplay();
+            } else {
+                alert('Неверное секретное слово! Проверьте правильность.');
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            updateLimitDisplay();
+        });
+
+        const myMicBtn = document.getElementById('myMicBtn');
+        const partnerMicBtn = document.getElementById('partnerMicBtn');
+        const originalTextDiv = document.getElementById('originalText');
+        const translatedTextDiv = document.getElementById('translatedText');
+        const originalLabel = document.getElementById('originalLabel');
+        const translatedLabel = document.getElementById('translatedLabel');
+        
+        const myLangSelect = document.getElementById('myLang');
+        const targetLangSelect = document.getElementById('targetLang');
+        const partnerLangSelect = document.getElementById('partnerLang');
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (!SpeechRecognition) {
+            alert('Ваш браузер не поддерживает распознавание речи.');
+            myMicBtn.disabled = true;
+            partnerMicBtn.disabled = true;
+        } else {
+            let recognition = null;
+            let activeBtn = null;
+
+            function handleMicClick(lang, isMyTurn, btnElement) {
+                // Проверяем премиум
+                if (localStorage.getItem('is_premium') !== 'true') {
+                    let uses = getUsageCount();
+                    
+                    if (uses >= FREE_LIMIT) {
+                        document.getElementById('paywallModal').style.display = 'flex';
+                        return;
+                    }
+
+                    // Увеличиваем счетчик
+                    uses += 1;
+                    localStorage.setItem('translation_uses', uses);
+                    updateLimitDisplay();
+
+                    // Если после клика лимит исчерпался — сразу выкидываем платную шторку
+                    if (uses >= FREE_LIMIT) {
+                        document.getElementById('paywallModal').style.display = 'flex';
+                    }
+                }
+
+                if (activeBtn === btnElement) {
+                    if (recognition) recognition.stop();
+                    return;
+                }
+                if (recognition) recognition.stop();
+
+                activeBtn = btnElement;
+                btnElement.dataset.defaultText = btnElement.textContent;
+                btnElement.classList.add('recording');
+                btnElement.textContent = isMyTurn ? 'Слушаю вас...' : 'Слушаю собеседника...';
+
+                startListening(lang, isMyTurn, btnElement);
+            }
+
+            function startListening(lang, isMyTurn, btnElement) {
+                recognition = new SpeechRecognition();
+                recognition.interimResults = false;
+                recognition.lang = lang;
+
+                recognition.onstart = () => {
+                    originalTextDiv.textContent = 'Говорите...';
+                    translatedTextDiv.textContent = '-';
+                    originalLabel.textContent = isMyTurn ? 'Вы сказали:' : 'Собеседник сказал:';
+                    translatedLabel.textContent = 'Перевод:';
+                };
+
+                recognition.onresult = async (event) => {
+                    const speechToText = event.results[0][0].transcript;
+                    originalTextDiv.textContent = speechToText;
+
+                    let srcLangCode, tgtLangCode;
+
+                    if (isMyTurn) {
+                        srcLangCode = myLangSelect.value.split('-')[0];
+                        tgtLangCode = targetLangSelect.value;
+                    } else {
+                        srcLangCode = partnerLangSelect.value.split('-')[0];
+                        tgtLangCode = myLangSelect.value.split('-')[0];
+                    }
+
+                    await translateAndSpeak(speechToText, srcLangCode, tgtLangCode);
+                };
+
+                recognition.onerror = (event) => {
+                    console.error(event.error);
+                    originalTextDiv.textContent = 'Ошибка распознавания. Попробуйте еще раз.';
+                };
+
+                recognition.onend = () => {
+                    if (btnElement) {
+                        btnElement.classList.remove('recording');
+                        btnElement.textContent = btnElement.dataset.defaultText;
+                        activeBtn = null;
+                    }
+                };
+
+                recognition.start();
+            }
+
+            myMicBtn.addEventListener('click', () => {
+                handleMicClick(myLangSelect.value, true, myMicBtn);
+            });
+
+            partnerMicBtn.addEventListener('click', () => {
+                handleMicClick(partnerLangSelect.value, false, partnerMicBtn);
+            });
+
+            async function translateAndSpeak(text, srcLang, targetLang) {
+                translatedTextDiv.textContent = 'Переводим...';
+                try {
+                    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${srcLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+                    
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    
+                    if (data && data.length > 0 && data[0] && data[0][0] && data[0][0][0]) {
+                        let translatedText = data[0].map(item => item[0]).join('');
+                        translatedTextDiv.textContent = translatedText;
+                        
+                        speakText(translatedText, targetLang);
+                    } else {
+                        translatedTextDiv.textContent = 'Ошибка перевода.';
+                    }
+                } catch (error) {
+                    console.error(error);
+                    translatedTextDiv.textContent = 'Не удалось связаться с сервером перевода.';
+                }
+            }
+
+            function speakText(text, lang) {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    
+                    if (lang === 'kk') {
+                        utterance.lang = 'kk-KZ';
+                    } else if (lang === 'ru') {
+                        utterance.lang =- 'ru-RU';
+                    } else if (lang === 'en') {
+                        utterance.lang = 'en-US';
+                    } else {
+                        utterance.lang = lang;
+                    }
+
+                    utterance.rate = 1.0;
+                    window.speechSynthesis.speak(utterance);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
